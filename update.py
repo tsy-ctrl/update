@@ -11,14 +11,13 @@ class OFDownloader:
         self.base_url = "https://api.github.com/repos/ppleaser/OF_HELPER"
         self.raw_base_url = "https://raw.githubusercontent.com/ppleaser/OF_HELPER/main"
         
-        # Изменённое определение корневой директории
         if getattr(sys, 'frozen', False):
             # Если запущено как exe
-            self.root_dir = os.path.dirname(sys.executable)
+            self.root_dir = os.path.dirname(os.path.dirname(sys.executable))  # Поднимаемся на уровень выше
         else:
             # Если запущено как python скрипт
             self.root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-            
+                    
         self.status_file = os.path.join(self.root_dir, "update.json")
         self.status_data = {"last_commit": None}
         self._load_status()
