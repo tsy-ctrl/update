@@ -4,15 +4,26 @@ from typing import Dict, List
 import json
 from datetime import datetime
 import pytz
+import sys
 
 class OFDownloader:
     def __init__(self):
         self.base_url = "https://api.github.com/repos/ppleaser/OF_HELPER"
         self.raw_base_url = "https://raw.githubusercontent.com/ppleaser/OF_HELPER/main"
-        self.root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        self.status_file = "update.json"
+        
+        # Изменённое определение корневой директории
+        if getattr(sys, 'frozen', False):
+            # Если запущено как exe
+            self.root_dir = os.path.dirname(sys.executable)
+        else:
+            # Если запущено как python скрипт
+            self.root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            
+        self.status_file = os.path.join(self.root_dir, "update.json")
         self.status_data = {"last_commit": None}
         self._load_status()
+        
+        print(f"Рабочая директория: {self.root_dir}")  # Добавим для отладки
 
     def _load_status(self):
         if os.path.exists(self.status_file):
@@ -49,15 +60,16 @@ class OFDownloader:
             ]
 
             if not self.status_data["last_commit"]:
-                return filtered_commits[:-1] if len(filtered_commits) > 1 else []
+                return [filtered_commits[0]] if filtered_commits else []
 
+            # Find index of last processed commit
             last_commit_index = next(
                 (i for i, commit in enumerate(filtered_commits)
                 if commit['sha'] == self.status_data["last_commit"]),
                 None
             )
 
-            if last_commit_index is not None:
+            if last_commit_index is not None and last_commit_index > 0:
                 return filtered_commits[:last_commit_index]
             return []
 
@@ -81,18 +93,31 @@ class OFDownloader:
             response = requests.get(f"{self.raw_base_url}/{file_path}")
             
             if response.status_code != 200:
+                print(f"Ошибка скачивания {file_path}: {response.status_code}")  # Добавим для отладки
                 return False
 
             full_path = os.path.join(self.root_dir, file_path)
             directory = os.path.dirname(full_path)
-            if directory:
-                os.makedirs(directory, exist_ok=True)
+            
+            try:
+                if directory:
+                    os.makedirs(directory, exist_ok=True)
+                    print(f"Создана директория: {directory}")  # Добавим для отладки
+            except Exception as e:
+                print(f"Ошибка создания директории {directory}: {e}")  # Добавим для отладки
+                return False
 
-            with open(full_path, 'wb') as f:
-                f.write(response.content)
-            return True
+            try:
+                with open(full_path, 'wb') as f:
+                    f.write(response.content)
+                print(f"Файл успешно сохранен: {full_path}")  # Добавим для отладки
+                return True
+            except Exception as e:
+                print(f"Ошибка сохранения файла {full_path}: {e}")  # Добавим для отладки
+                return False
 
-        except Exception:
+        except Exception as e:
+            print(f"Общая ошибка скачивания {file_path}: {e}")  # Добавим для отладки
             return False
 
     def update_files(self):
@@ -105,25 +130,6 @@ class OFDownloader:
             commits.reverse()
             print(f"Получено {len(commits)} новых обновлений:")
             
-            # Создаем словарь для отслеживания последних версий файлов
-            latest_files = {}
-            
-            # Сначала собираем информацию о последних версиях файлов
-            for commit in commits:
-                commit_url = f"{self.base_url}/commits/{commit['sha']}"
-                headers = {'Accept': 'application/vnd.github.v3+json'}
-                response = requests.get(commit_url, headers=headers)
-                
-                if response.status_code != 200:
-                    continue
-
-                commit_data = response.json()
-                for file_data in commit_data.get('files', []):
-                    filename = file_data.get('filename')
-                    if filename:
-                        latest_files[filename] = commit['sha']
-
-            # Теперь обрабатываем каждый коммит
             for i, commit in enumerate(commits, 1):
                 commit_date = self.format_commit_date(commit['commit']['author']['date'])
                 print(f"\n{i}. {commit_date} - {commit['commit']['message']}")
@@ -131,6 +137,7 @@ class OFDownloader:
                 print(f"\nНачало обновления {i}")
                 
                 commit_url = f"{self.base_url}/commits/{commit['sha']}"
+                headers = {'Accept': 'application/vnd.github.v3+json'}
                 response = requests.get(commit_url, headers=headers)
                 
                 if response.status_code != 200:
@@ -141,14 +148,7 @@ class OFDownloader:
                 
                 for file_data in commit_data.get('files', []):
                     filename = file_data.get('filename')
-                    if not filename:
-                        continue
-                        
-                    if latest_files[filename] != commit['sha']:
-                        print(f"Обнаружена более новая версия файла {filename} - пропуск")
-                        continue
-                        
-                    if self._download_file(filename):
+                    if filename and self._download_file(filename):
                         changed_files.append(filename)
                 
                 if changed_files:
