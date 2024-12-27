@@ -3,6 +3,8 @@ import requests
 from typing import Dict, List
 import json
 import hashlib
+from datetime import datetime
+import pytz
 
 class OFDownloader:
     def __init__(self):
@@ -66,10 +68,22 @@ class OFDownloader:
         except Exception as e:
             print(f"Ошибка при получении коммитов: {str(e)}")
             return []
+        s
+    def format_commit_date(self, date_str: str) -> str:
+        """Преобразует дату из ISO формата в читаемый вид"""
+        try:
+            # Парсим ISO дату
+            date = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+            # Конвертируем в локальное время
+            local_date = date.astimezone(pytz.timezone('Europe/Kyiv'))
+            # Форматируем
+            return local_date.strftime('%d.%m.%Y %H:%M:%S')
+        except Exception as e:
+            return date_str
 
     def _download_file(self, file_path: str) -> bool:
         try:
-            print(f"\nПытаюсь скачать файл: {file_path}")
+            print(f"\nСкачиваю файл: {file_path}")
             
             if not file_path:
                 print("Пустой путь файла")
@@ -113,7 +127,6 @@ class OFDownloader:
 
     def update_files(self):
         try:
-            print("Начинаю процесс обновления...")
             
             commits = self._get_commits_since_last_update()
             if not commits:
@@ -121,13 +134,12 @@ class OFDownloader:
                 input("\nНажмите Enter для выхода...")
                 return
 
-            print(f"\nОбработка {len(commits)} коммитов...")
             commits.reverse()  # От старых к новым
             
             total_updated = 0
             for commit in commits:
                 print(f"\nОбрабатываю коммит: {commit['sha']}")
-                print(f"Дата: {commit['commit']['author']['date']}")
+                print(f"Дата: {self.format_commit_date(commit['commit']['author']['date'])}")
                 print(f"Сообщение: {commit['commit']['message']}")
 
                 # Получаем детали коммита
