@@ -1,25 +1,6 @@
 import sys
 import subprocess
 import os
-
-def install_dependencies():
-    """Установка необходимых библиотек"""
-    required = {'requests'}
-    installed = {pkg.split('==')[0] for pkg in subprocess.check_output([sys.executable, '-m', 'pip', 'freeze']).decode().split()}
-    missing = required - installed
-    
-    if missing:
-        print("Установка необходимых библиотек...")
-        subprocess.check_call([sys.executable, '-m', 'pip', 'install'] + list(missing))
-        print("Библиотеки успешно установлены\n")
-
-try:
-    install_dependencies()
-except Exception as e:
-    print(f"Ошибка при установке библиотек: {e}")
-    input("\nНажмите Enter для выхода...")
-    sys.exit(1)
-
 import requests
 from typing import Dict, Optional, List
 from datetime import datetime
