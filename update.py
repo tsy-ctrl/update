@@ -1,7 +1,6 @@
 import os
 import requests
-from typing import Dict, Optional, List
-from datetime import datetime
+from typing import Dict, List
 import json
 import hashlib
 
@@ -48,21 +47,19 @@ class OFDownloader:
             headers = {'Accept': 'application/vnd.github.v3+json'}
             response = requests.get(self.base_url + "/commits", headers=headers)
             
-            print(f"Статус ответа: {response.status_code}")
             if response.status_code != 200:
                 print(f"Тело ответа: {response.text}")
                 return []
 
             commits = response.json()
-            print(f"Получено коммитов: {len(commits)}")
-            
+
             # Фильтруем мерж-коммиты и первый коммит
             if len(commits) > 0:
                 filtered_commits = [
                     commit for commit in commits[:-1]  # Исключаем последний (самый старый) коммит
                     if not self._is_merge_commit(commit)
                 ]
-                print(f"После фильтрации: {len(filtered_commits)} коммитов")
+                print(f"Получено: {len(filtered_commits)} коммитов")
                 return filtered_commits
             return []
 
@@ -79,7 +76,6 @@ class OFDownloader:
                 return False
 
             response = requests.get(f"{self.raw_base_url}/{file_path}")
-            print(f"Статус ответа: {response.status_code}")
             
             if response.status_code != 200:
                 print(f"Ошибка скачивания: {response.text}")
@@ -139,7 +135,6 @@ class OFDownloader:
                 headers = {'Accept': 'application/vnd.github.v3+json'}
                 response = requests.get(commit_url, headers=headers)
                 
-                print(f"Статус ответа деталей коммита: {response.status_code}")
                 if response.status_code != 200:
                     print(f"Ошибка получения деталей: {response.text}")
                     continue
