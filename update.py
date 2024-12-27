@@ -12,17 +12,13 @@ class OFDownloader:
         self.raw_base_url = "https://raw.githubusercontent.com/ppleaser/OF_HELPER/main"
         
         if getattr(sys, 'frozen', False):
-            # Если запущено как exe
-            self.root_dir = os.path.dirname(os.path.dirname(sys.executable))  # Поднимаемся на уровень выше
+            self.root_dir = os.path.dirname(os.path.dirname(sys.executable))
         else:
-            # Если запущено как python скрипт
             self.root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         self.update_dir = os.path.join(self.root_dir, "update")            
         self.status_file = os.path.join(self.update_dir, "update.json")
         self.status_data = {"last_commit": None}
         self._load_status()
-        
-        print(f"Рабочая директория: {self.root_dir}")  # Добавим для отладки
 
     def _load_status(self):
         if os.path.exists(self.status_file):
@@ -49,7 +45,11 @@ class OFDownloader:
             headers = {'Accept': 'application/vnd.github.v3+json'}
             response = requests.get(f"{self.base_url}/commits", headers=headers)
             
-            if response.status_code != 200:
+            if response.status_code == 403:
+                print("Превышен лимит запросов к GitHub API. Попробуйте позже.")
+                return []
+            elif response.status_code != 200:
+                print(f"Ошибка получения коммитов. Код ответа: {response.status_code}")
                 return []
 
             all_commits = response.json()
@@ -61,7 +61,6 @@ class OFDownloader:
             if not self.status_data["last_commit"]:
                 return [filtered_commits[0]] if filtered_commits else []
 
-            # Find index of last processed commit
             last_commit_index = next(
                 (i for i, commit in enumerate(filtered_commits)
                 if commit['sha'] == self.status_data["last_commit"]),
@@ -72,8 +71,11 @@ class OFDownloader:
                 return filtered_commits[:last_commit_index]
             return []
 
+        except requests.exceptions.RequestException as e:
+            print(f"Ошибка сетевого подключения: {e}")
+            return []
         except Exception as e:
-            print(f"Ошибка при получении коммитов: {str(e)}")
+            print(f"Неожиданная ошибка при получении коммитов: {e}")
             return []
      
     def format_commit_date(self, date_str: str) -> str:
@@ -92,7 +94,7 @@ class OFDownloader:
             response = requests.get(f"{self.raw_base_url}/{file_path}")
             
             if response.status_code != 200:
-                print(f"Ошибка скачивания {file_path}: {response.status_code}")  # Добавим для отладки
+                print(f"Ошибка скачивания {file_path}: {response.status_code}")
                 return False
 
             full_path = os.path.join(self.root_dir, file_path)
@@ -101,29 +103,27 @@ class OFDownloader:
             try:
                 if directory:
                     os.makedirs(directory, exist_ok=True)
-                    print(f"Создана директория: {directory}")  # Добавим для отладки
             except Exception as e:
-                print(f"Ошибка создания директории {directory}: {e}")  # Добавим для отладки
+                print(f"Ошибка создания директории {directory}: {e}")
                 return False
 
             try:
                 with open(full_path, 'wb') as f:
                     f.write(response.content)
-                print(f"Файл успешно сохранен: {full_path}")  # Добавим для отладки
                 return True
             except Exception as e:
-                print(f"Ошибка сохранения файла {full_path}: {e}")  # Добавим для отладки
+                print(f"Ошибка сохранения файла {full_path}: {e}")
                 return False
 
         except Exception as e:
-            print(f"Общая ошибка скачивания {file_path}: {e}")  # Добавим для отладки
+            print(f"Общая ошибка скачивания {file_path}: {e}")
             return False
 
     def update_files(self):
         try:
             commits = self._get_commits_since_last_update()
             if not commits:
-                print("Нет новых обновлений")
+                print("Обновления не найдены")
                 return
 
             commits.reverse()
@@ -140,15 +140,26 @@ class OFDownloader:
                 response = requests.get(commit_url, headers=headers)
                 
                 if response.status_code != 200:
+                    print("Ошибка получения информации о коммите")
                     continue
 
                 commit_data = response.json()
+                all_files_updated = True
                 changed_files = []
                 
                 for file_data in commit_data.get('files', []):
                     filename = file_data.get('filename')
-                    if filename and self._download_file(filename):
-                        changed_files.append(filename)
+                    if filename:
+                        if self._download_file(filename):
+                            changed_files.append(filename)
+                        else:
+                            all_files_updated = False
+                            print(f"Ошибка обновления файла: {filename}")
+                            break
+                
+                if not all_files_updated:
+                    print("\nОбновление прервано из-за ошибки")
+                    return
                 
                 if changed_files:
                     print("Были изменены файлы:")
@@ -166,5 +177,6 @@ class OFDownloader:
 if __name__ == "__main__":
     downloader = OFDownloader()
     downloader.update_files()
+    
     print("\nНажмите Enter для выхода...")
     input()
