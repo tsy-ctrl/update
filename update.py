@@ -19,6 +19,8 @@ class OFDownloader:
         self.status_file = os.path.join(self.update_dir, "update.json")
         self.status_data = {"last_commit": None}
         self._load_status()
+        
+        print(f"Рабочая директория: {self.root_dir}")
 
     def _load_status(self):
         if os.path.exists(self.status_file):
@@ -54,12 +56,12 @@ class OFDownloader:
 
             all_commits = response.json()
             filtered_commits = [
-                commit for commit in all_commits 
+                commit for commit in all_commits[:-1]
                 if not self._is_merge_commit(commit)
             ]
-
+            
             if not self.status_data["last_commit"]:
-                return [filtered_commits[0]] if filtered_commits else []
+                return filtered_commits
 
             last_commit_index = next(
                 (i for i, commit in enumerate(filtered_commits)
@@ -67,8 +69,8 @@ class OFDownloader:
                 None
             )
 
-            if last_commit_index is not None and last_commit_index > 0:
-                return filtered_commits[:last_commit_index]
+            if last_commit_index is not None:
+                return filtered_commits[0:last_commit_index]
             return []
 
         except requests.exceptions.RequestException as e:
@@ -123,7 +125,7 @@ class OFDownloader:
         try:
             commits = self._get_commits_since_last_update()
             if not commits:
-                print("Обновления не найдены")
+                print("Нет новых обновлений или произошла ошибка получения данных")
                 return
 
             commits.reverse()
