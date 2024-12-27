@@ -166,3 +166,5 @@ class OFDownloader:
 if __name__ == "__main__":
     downloader = OFDownloader()
     downloader.update_files()
+    print("\nНажмите Enter для выхода...")
+    input()
