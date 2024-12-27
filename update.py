@@ -1,5 +1,3 @@
-import sys
-import subprocess
 import os
 import requests
 from typing import Dict, Optional, List
@@ -14,93 +12,77 @@ class OFDownloader:
         self.raw_base_url = "https://raw.githubusercontent.com/ppleaser/OF_HELPER/main"
         self.root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         self.status_file = "update.json"
-        self.last_update: Dict[str, str] = self._load_status()
+        self.status_data = {"last_commit": None, "files": {}}  # Инициализируем структуру
+        self._load_status()  # Загружаем существующие данные, если есть
 
-    def _load_status(self) -> Dict[str, str]:
-        """Загружает информацию о последнем обновлении"""
+    def _load_status(self):
+        """Загружает существующий статус или использует значения по умолчанию"""
         if os.path.exists(self.status_file):
             try:
                 with open(self.status_file, 'r', encoding='utf-8') as f:
-                    return json.load(f)
-            except:
-                return {}
-        return {}
+                    loaded_data = json.load(f)
+                    # Обновляем только существующие данные
+                    if isinstance(loaded_data, dict):
+                        if "last_commit" in loaded_data:
+                            self.status_data["last_commit"] = loaded_data["last_commit"]
+                        if "files" in loaded_data and isinstance(loaded_data["files"], dict):
+                            self.status_data["files"] = loaded_data["files"]
+            except Exception as e:
+                print(f"Ошибка загрузки статуса: {e}")
 
     def _save_status(self):
-        """Сохраняет информацию о последнем обновлении"""
-        with open(self.status_file, 'w', encoding='utf-8') as f:
-            json.dump(self.last_update, f, indent=2)
-
-    def _get_file_hash(self, file_path: str) -> Optional[str]:
-        """Получает хеш локального файла"""
-        full_path = os.path.join(self.root_dir, file_path)
-        if not os.path.exists(full_path):
-            return None
-        
-        with open(full_path, 'rb') as f:
-            return hashlib.sha256(f.read()).hexdigest()
+        """Сохраняет текущий статус"""
+        try:
+            with open(self.status_file, 'w', encoding='utf-8') as f:
+                json.dump(self.status_data, f, indent=2)
+        except Exception as e:
+            print(f"Ошибка сохранения статуса: {e}")
 
     def _is_merge_commit(self, commit_data: dict) -> bool:
         """Проверяет, является ли коммит мерж-коммитом"""
         return len(commit_data.get('parents', [])) > 1
 
-    def _get_changed_files(self) -> tuple[List[str], str, str]:
-        """
-        Получает список файлов, измененных в последнем коммите
-        :return: (список файлов, время коммита, описание коммита)
-        """
+    def _get_commits_since_last_update(self) -> List[Dict]:
         try:
-            # Получаем список коммитов
-            commits_url = f"{self.base_url}/commits"
-            response = requests.get(commits_url)
+            print("\nЗапрашиваю список коммитов...")
+            headers = {'Accept': 'application/vnd.github.v3+json'}
+            response = requests.get(self.base_url + "/commits", headers=headers)
+            
+            print(f"Статус ответа: {response.status_code}")
             if response.status_code != 200:
-                print(f"Ошибка при получении коммитов: {response.status_code}")
-                return [], "", ""
+                print(f"Тело ответа: {response.text}")
+                return []
 
             commits = response.json()
+            print(f"Получено коммитов: {len(commits)}")
             
-            # Находим первый не мерж-коммит
-            commit_index = 0
-            while commit_index < len(commits) and self._is_merge_commit(commits[commit_index]):
-                commit_index += 1
-
-            if commit_index >= len(commits):
-                print("Не найдено подходящих коммитов")
-                return [], "", ""
-
-            latest_commit = commits[commit_index]
-            commit_sha = latest_commit['sha']
-            commit_time = datetime.fromisoformat(latest_commit['commit']['author']['date'].replace('Z', '+00:00'))
-            commit_message = latest_commit['commit']['message']
-
-            # Получаем детали коммита
-            commit_url = f"{self.base_url}/commits/{commit_sha}"
-            response = requests.get(commit_url)
-            if response.status_code != 200:
-                print(f"Ошибка при получении деталей коммита: {response.status_code}")
-                return [], "", ""
-
-            # Извлекаем измененные файлы
-            files = response.json()['files']
-            return [file['filename'] for file in files], commit_time.strftime("%Y-%m-%d %H:%M:%S UTC"), commit_message
+            # Фильтруем мерж-коммиты и первый коммит
+            if len(commits) > 0:
+                filtered_commits = [
+                    commit for commit in commits[:-1]  # Исключаем последний (самый старый) коммит
+                    if not self._is_merge_commit(commit)
+                ]
+                print(f"После фильтрации: {len(filtered_commits)} коммитов")
+                return filtered_commits
+            return []
 
         except Exception as e:
-            print(f"Ошибка при получении измененных файлов: {e}")
-            return [], "", ""
+            print(f"Ошибка при получении коммитов: {str(e)}")
+            return []
 
     def _download_file(self, file_path: str) -> bool:
-        """
-        Скачивает файл с GitHub
-        :return: True если файл был обновлён
-        """
         try:
+            print(f"\nПытаюсь скачать файл: {file_path}")
+            
             if not file_path:
-                print("Пропущен файл с пустым путём")
+                print("Пустой путь файла")
                 return False
 
             response = requests.get(f"{self.raw_base_url}/{file_path}")
+            print(f"Статус ответа: {response.status_code}")
+            
             if response.status_code != 200:
-                print(f"Ошибка при скачивании {file_path}: {response.status_code}")
+                print(f"Ошибка скачивания: {response.text}")
                 return False
 
             full_path = os.path.join(self.root_dir, file_path)
@@ -108,56 +90,86 @@ class OFDownloader:
             if directory:
                 os.makedirs(directory, exist_ok=True)
 
-            new_content = response.content
-            new_hash = hashlib.sha256(new_content).hexdigest()
-            old_hash = self._get_file_hash(file_path)
-
+            content = response.content
+            new_hash = hashlib.sha256(content).hexdigest()
+            
+            # Убеждаемся, что словарь files существует
+            if "files" not in self.status_data:
+                self.status_data["files"] = {}
+                
+            # Проверяем изменения
+            old_hash = self.status_data["files"].get(file_path)
             if new_hash == old_hash:
-                print(f"Файл {file_path} не изменился")
+                print("Файл не изменился")
                 return False
 
+            # Сохраняем файл
             with open(full_path, 'wb') as f:
-                f.write(new_content)
+                f.write(content)
 
-            self.last_update[file_path] = new_hash
-            print(f"Обновлен файл: {file_path}")
+            self.status_data["files"][file_path] = new_hash
+            print("Файл успешно обновлен")
             return True
 
         except Exception as e:
-            print(f"Ошибка при обработке файла {file_path}: {e}")
+            print(f"Ошибка при обработке файла {file_path}: {str(e)}")
             return False
 
     def update_files(self):
-        """Обновляет только измененные файлы из последнего коммита"""
         try:
-            print("Получаю информацию о последних изменениях...")
+            print("Начинаю процесс обновления...")
             
-            changed_files, commit_time, commit_message = self._get_changed_files()
-            if not changed_files:
-                print("Не найдено измененных файлов или произошла ошибка при получении информации")
+            commits = self._get_commits_since_last_update()
+            if not commits:
+                print("Нет коммитов для обработки")
                 input("\nНажмите Enter для выхода...")
                 return
 
-            print(f"\nПоследний коммит от: {commit_time}")
-            print(f"Сообщение коммита: {commit_message}")
-            print(f"\nНайдено измененных файлов: {len(changed_files)}")
-            print("\nСписок измененных файлов:")
-            for file in changed_files:
-                print(f"- {file}")
+            print(f"\nОбработка {len(commits)} коммитов...")
+            commits.reverse()  # От старых к новым
             
-            print("\nНачинаю обновление...\n")
+            total_updated = 0
+            for commit in commits:
+                print(f"\nОбрабатываю коммит: {commit['sha']}")
+                print(f"Дата: {commit['commit']['author']['date']}")
+                print(f"Сообщение: {commit['commit']['message']}")
 
-            updated_count = 0
-            for file_path in changed_files:
-                if self._download_file(file_path):
-                    updated_count += 1
+                # Получаем детали коммита
+                commit_url = f"{self.base_url}/commits/{commit['sha']}"
+                headers = {'Accept': 'application/vnd.github.v3+json'}
+                response = requests.get(commit_url, headers=headers)
+                
+                print(f"Статус ответа деталей коммита: {response.status_code}")
+                if response.status_code != 200:
+                    print(f"Ошибка получения деталей: {response.text}")
+                    continue
 
-            self._save_status()
-            print(f"\nГотово! Обновлено файлов: {updated_count}")
+                commit_data = response.json()
+                files = commit_data.get('files', [])
+                print(f"Файлов в коммите: {len(files)}")
+
+                # Обрабатываем каждый файл
+                commit_updated = 0
+                for file_data in files:
+                    filename = file_data.get('filename')
+                    if filename and self._download_file(filename):
+                        commit_updated += 1
+                        total_updated += 1
+
+                print(f"Обновлено в этом коммите: {commit_updated}")
+                
+                # Сохраняем прогресс
+                self.status_data["last_commit"] = commit['sha']
+                self._save_status()
+
+            print(f"\nВсего обновлено файлов: {total_updated}")
             input("\nНажмите Enter для выхода...")
 
         except Exception as e:
-            print(f"\nПроизошла ошибка: {e}")
+            print(f"\nОшибка: {str(e)}")
+            print("Полная информация об ошибке:")
+            import traceback
+            traceback.print_exc()
             input("\nНажмите Enter для выхода...")
 
 if __name__ == "__main__":
