@@ -17,8 +17,8 @@ class OFDownloader:
         else:
             # Если запущено как python скрипт
             self.root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-                    
-        self.status_file = os.path.join(self.root_dir, "update.json")
+        self.update_dir = os.path.join(self.root_dir, "update")            
+        self.status_file = os.path.join(self.update_dir, "update.json")
         self.status_data = {"last_commit": None}
         self._load_status()
         
