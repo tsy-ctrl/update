@@ -25,6 +25,7 @@ jobs:
         pip install requests
         pip install datetime
         pip install pytz
+        pip install tqdm
     
     - name: Build executable
       run: pyinstaller --onefile update.py
@@ -53,6 +54,7 @@ jobs:
         pip install requests
         pip install datetime
         pip install pytz
+        pip install tqdm
     
     - name: Build executable
       run: pyinstaller --onefile update.py
