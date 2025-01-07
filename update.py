@@ -1,6 +1,6 @@
 import os
 import requests
-from typing import Dict, List, Set
+from typing import Dict, List
 import json
 from datetime import datetime
 import pytz
@@ -20,8 +20,6 @@ class OFDownloader:
         self.status_file = os.path.join(self.update_dir, "update.json")
         self.status_data = {"last_commit": None}
         self._load_status()
-        
-        print(f"Рабочая директория: {self.root_dir}")
 
     def _load_status(self):
         if os.path.exists(self.status_file):
