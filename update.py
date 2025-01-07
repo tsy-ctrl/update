@@ -1,10 +1,11 @@
 import os
 import requests
-from typing import Dict, List
+from typing import Dict, List, Set
 import json
 from datetime import datetime
 import pytz
 import sys
+from tqdm import tqdm
 
 class OFDownloader:
     def __init__(self):
@@ -121,6 +122,19 @@ class OFDownloader:
             print(f"Общая ошибка скачивания {file_path}: {e}")
             return False
 
+    def get_later_updates_for_file(self, file_path: str, current_commit_index: int, commits_data: List[Dict]) -> bool:
+        """Проверяет, обновляется ли файл в более поздних коммитах"""
+        for future_commit in commits_data[current_commit_index + 1:]:
+            commit_url = f"{self.base_url}/commits/{future_commit['sha']}"
+            headers = {'Accept': 'application/vnd.github.v3+json'}
+            response = requests.get(commit_url, headers=headers)
+            
+            if response.status_code == 200:
+                commit_files = response.json().get('files', [])
+                if any(f.get('filename') == file_path for f in commit_files):
+                    return True
+        return False
+
     def update_files(self):
         try:
             commits = self._get_commits_since_last_update()
@@ -135,7 +149,7 @@ class OFDownloader:
                 commit_date = self.format_commit_date(commit['commit']['author']['date'])
                 print(f"\n{i}. {commit_date} - {commit['commit']['message']}")
                 
-                print(f"\nНачало обновления {i}")
+                print(f"\nНачало обновления {i}/{len(commits)}")
                 
                 commit_url = f"{self.base_url}/commits/{commit['sha']}"
                 headers = {'Accept': 'application/vnd.github.v3+json'}
@@ -148,24 +162,43 @@ class OFDownloader:
                 commit_data = response.json()
                 all_files_updated = True
                 changed_files = []
+                skipped_files = []
                 
-                for file_data in commit_data.get('files', []):
-                    filename = file_data.get('filename')
-                    if filename:
-                        if self._download_file(filename):
-                            changed_files.append(filename)
-                        else:
-                            all_files_updated = False
-                            print(f"Ошибка обновления файла: {filename}")
-                            break
+                files_to_process = commit_data.get('files', [])
+                
+                # Создаем progress bar для текущего обновления
+                with tqdm(total=len(files_to_process), desc="Прогресс обновления", 
+                         bar_format='{l_bar}{bar}| {n_fmt}/{total_fmt}') as pbar:
+                    
+                    for file_data in files_to_process:
+                        filename = file_data.get('filename')
+                        if filename:
+                            # Проверяем, обновляется ли файл в более поздних коммитах
+                            if i < len(commits) and self.get_later_updates_for_file(filename, i-1, commits):
+                                skipped_files.append(filename)
+                                pbar.update(1)
+                                continue
+                                
+                            if self._download_file(filename):
+                                changed_files.append(filename)
+                            else:
+                                all_files_updated = False
+                                print(f"Ошибка обновления файла: {filename}")
+                                break
+                        pbar.update(1)
                 
                 if not all_files_updated:
                     print("\nОбновление прервано из-за ошибки")
                     return
                 
                 if changed_files:
-                    print("Были изменены файлы:")
+                    print("\nБыли изменены файлы:")
                     for file in changed_files:
+                        print(f"- {file}")
+                
+                if skipped_files:
+                    print("\nПропущены файлы (будут обновлены позже):")
+                    for file in skipped_files:
                         print(f"- {file}")
                 
                 self.status_data["last_commit"] = commit['sha']
