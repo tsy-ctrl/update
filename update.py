@@ -8,6 +8,7 @@ import sys
 from tqdm import tqdm
 
 class OFDownloader:
+    # Token placeholder that will be replaced during build
     GITHUB_TOKEN = "GITHUB_TOKEN_PLACEHOLDER"
 
     def _check_rate_limit(self):
@@ -27,13 +28,14 @@ class OFDownloader:
         self.base_url = "https://api.github.com/repos/ppleaser/OF_HELPER"
         self.raw_base_url = "https://raw.githubusercontent.com/ppleaser/OF_HELPER/main"
         
-        if self.GITHUB_TOKEN == "GITHUB_TOKEN_PLACEHOLDER":
+        token = self.GITHUB_TOKEN
+        if not token or token == "GITHUB_TOKEN_PLACEHOLDER":
             print("Ошибка: Токен не установлен")
             sys.exit(1)
-            
+
         self.headers = {
             'Accept': 'application/vnd.github.v3+json',
-            'Authorization': f'Bearer {self.GITHUB_TOKEN}'
+            'Authorization': f'Bearer {token}'
         }
         
         self._check_rate_limit()
@@ -297,4 +299,3 @@ if __name__ == "__main__":
     print("\nНажмите Enter для выхода...")
     input()
 
-    
