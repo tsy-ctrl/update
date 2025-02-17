@@ -29,9 +29,6 @@ class OFDownloader:
         self.raw_base_url = "https://raw.githubusercontent.com/ppleaser/OF_HELPER/main"
         
         token = self.GITHUB_TOKEN
-        if not token or token == "GITHUB_TOKEN_PLACEHOLDER":
-            print("Ошибка: Токен не установлен")
-            sys.exit(1)
 
         self.headers = {
             'Accept': 'application/vnd.github.v3+json',
