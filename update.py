@@ -8,6 +8,26 @@ import sys
 from tqdm import tqdm
 
 class OFDownloader:
+    def _get_embedded_token(self):
+        try:
+            if getattr(sys, 'frozen', False):
+                if hasattr(sys, '_MEIPASS'):
+                    base_path = sys._MEIPASS
+                else:
+                    base_path = os.path.dirname(sys.executable)
+            else:
+                base_path = os.path.dirname(os.path.abspath(__file__))
+            
+            token_path = os.path.join(base_path, 'token.txt')
+            
+            if os.path.exists(token_path):
+                with open(token_path, 'r') as f:
+                    return f.read().strip()
+            return None
+        except Exception as e:
+            print(f"Ошибка чтения токена: {e}")
+            return None
+
     def _check_rate_limit(self):
         response = requests.get(
             "https://api.github.com/rate_limit",
@@ -24,11 +44,17 @@ class OFDownloader:
     def __init__(self):
         self.base_url = "https://api.github.com/repos/ppleaser/OF_HELPER"
         self.raw_base_url = "https://raw.githubusercontent.com/ppleaser/OF_HELPER/main"
-        github_token = os.getenv('TOKEN', '')
+        
+        token = self._get_embedded_token()
+        if not token:
+            print("Ошибка: Не удалось получить токен")
+            sys.exit(1)
+        
         self.headers = {
             'Accept': 'application/vnd.github.v3+json',
-            'Authorization': f'Bearer {github_token}'
+            'Authorization': f'Bearer {token}'
         }
+        
         self._check_rate_limit()
         
         if getattr(sys, 'frozen', False):
@@ -71,11 +97,23 @@ class OFDownloader:
         try:
             response = requests.get(f"{self.base_url}/commits", headers=self.headers)
             
-            if response.status_code == 403:
+            if response.status_code == 401:
+                error_message = response.json().get('message', 'Неизвестная ошибка')
+                print(f"Ошибка авторизации (401): {error_message}")
+                print("Возможные причины:")
+                print("1. Токен недействителен или истек")
+                print("2. У токена нет необходимых прав доступа")
+                print("3. Токен был отозван")
+                return []
+            elif response.status_code == 403:
                 print("Превышен лимит запросов к GitHub API. Попробуйте позже.")
                 return []
             elif response.status_code != 200:
+                error_data = response.json()
                 print(f"Ошибка получения коммитов. Код ответа: {response.status_code}")
+                print(f"Сообщение об ошибке: {error_data.get('message', 'Нет дополнительной информации')}")
+                if 'documentation_url' in error_data:
+                    print(f"Документация: {error_data['documentation_url']}")
                 return []
 
             all_commits = response.json()
@@ -131,7 +169,6 @@ class OFDownloader:
             return False
 
     def get_later_updates_for_file(self, file_path: str, commit_sha: str, all_commits: List[Dict]) -> bool:
-
         current_index = next((i for i, commit in enumerate(all_commits) 
                             if commit['sha'] == commit_sha), -1)
         
@@ -236,7 +273,6 @@ class OFDownloader:
                 for file_data in files_to_process:
                     filename = file_data.get('filename')
                     if filename:
-                        # Check if this file exists in any newer commits
                         if self.get_later_updates_for_file(filename, commit['sha'], all_commits):
                             skipped_files.append(filename)
                             pbar.update(1)
