@@ -1,9 +1,11 @@
 name: Build Executables
+
 on:
   push:
     branches: [ main ]
   pull_request:
     branches: [ main ]
+
 jobs:
   build-windows:
     runs-on: windows-latest
@@ -25,19 +27,22 @@ jobs:
         pip install pytz
         pip install tqdm
     
-    - name: Build executable
+    - name: Prepare source with token
       env:
         TOKEN: ${{ secrets.TOKEN }}
       run: |
-        pyinstaller --onefile --add-data "token.txt;." update.py
-        echo $env:TOKEN > dist/token.txt
+        (Get-Content update.py) -replace 'GITHUB_TOKEN_PLACEHOLDER', "$env:TOKEN" | Set-Content update.py
+    
+    - name: Build executable
+      run: |
+        pyinstaller --onefile --clean update.py
     
     - name: Upload Windows executable
       uses: actions/upload-artifact@v4
       with:
         name: update-windows
         path: dist/
-
+        
   build-macos:
     runs-on: macos-latest
     
@@ -58,12 +63,15 @@ jobs:
         pip install pytz
         pip install tqdm
     
-    - name: Build executable
+    - name: Prepare source with token
       env:
         TOKEN: ${{ secrets.TOKEN }}
       run: |
-        pyinstaller --onefile --add-data "token.txt:." update.py
-        echo $TOKEN > dist/token.txt
+        sed -i '' "s/GITHUB_TOKEN_PLACEHOLDER/$TOKEN/g" update.py
+    
+    - name: Build executable
+      run: |
+        pyinstaller --onefile --clean update.py
     
     - name: Upload macOS executable
       uses: actions/upload-artifact@v4
