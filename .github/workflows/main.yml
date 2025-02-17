@@ -28,10 +28,14 @@ jobs:
         pip install tqdm
     
     - name: Prepare source with token
+      shell: pwsh
       env:
         TOKEN: ${{ secrets.TOKEN }}
       run: |
-        (Get-Content update.py) -replace 'GITHUB_TOKEN_PLACEHOLDER', "$env:TOKEN" | Set-Content update.py
+        $content = Get-Content -Path update.py -Raw
+        $escapedToken = $env:TOKEN -replace '\\', '\\' -replace '"', '\"'
+        $content = $content -replace 'GITHUB_TOKEN_PLACEHOLDER', $escapedToken
+        Set-Content -Path update.py -Value $content
     
     - name: Build executable
       run: |
@@ -67,7 +71,8 @@ jobs:
       env:
         TOKEN: ${{ secrets.TOKEN }}
       run: |
-        sed -i '' "s/GITHUB_TOKEN_PLACEHOLDER/$TOKEN/g" update.py
+        escaped_token=$(echo "$TOKEN" | sed 's/[\/&]/\\&/g')
+        sed -i.bak "s/GITHUB_TOKEN_PLACEHOLDER/$escaped_token/g" update.py
     
     - name: Build executable
       run: |
