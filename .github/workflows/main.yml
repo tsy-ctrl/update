@@ -27,14 +27,16 @@ jobs:
     
     - name: Build executable
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: pyinstaller --onefile update.py
+        TOKEN: ${{ secrets.TOKEN }}
+      run: |
+        pyinstaller --onefile --add-data "token.txt;." update.py
+        echo $env:TOKEN > dist/token.txt
     
     - name: Upload Windows executable
       uses: actions/upload-artifact@v4
       with:
         name: update-windows
-        path: dist/update.exe
+        path: dist/
 
   build-macos:
     runs-on: macos-latest
@@ -58,11 +60,13 @@ jobs:
     
     - name: Build executable
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: pyinstaller --onefile update.py
+        TOKEN: ${{ secrets.TOKEN }}
+      run: |
+        pyinstaller --onefile --add-data "token.txt:." update.py
+        echo $TOKEN > dist/token.txt
     
     - name: Upload macOS executable
       uses: actions/upload-artifact@v4
       with:
         name: update-macos
-        path: dist/update
+        path: dist/
