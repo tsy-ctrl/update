@@ -8,7 +8,7 @@ import sys
 from tqdm import tqdm
 
 class OFDownloader:
-    # Token placeholder that will be replaced during build
+
     GITHUB_TOKEN = "GITHUB_TOKEN_PLACEHOLDER"
 
     def _check_rate_limit(self):
@@ -170,7 +170,7 @@ class OFDownloader:
         print("=" * 60)
         
         RED = '\033[91m'
-        YELLOW = '\033[93m'
+        YELLOW = '\033[33m'
         GREEN = '\033[92m'
         BLUE = '\033[94m'
         RESET = '\033[0m'
@@ -292,7 +292,4 @@ if __name__ == "__main__":
                 downloader.update_files(target_index)
             except ValueError:
                 print("Некорректный ввод. Обновление отменено.")
-    
-    print("\nНажмите Enter для выхода...")
     input()
-
