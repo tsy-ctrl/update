@@ -24,7 +24,7 @@ class OFDownloader:
     def __init__(self):
         self.base_url = "https://api.github.com/repos/ppleaser/OF_HELPER"
         self.raw_base_url = "https://raw.githubusercontent.com/ppleaser/OF_HELPER/main"
-        github_token = os.getenv('GITHUB_TOKEN', '')
+        github_token = os.getenv('TOKEN', '')
         self.headers = {
             'Accept': 'application/vnd.github.v3+json',
             'Authorization': f'Bearer {github_token}'
