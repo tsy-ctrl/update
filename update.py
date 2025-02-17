@@ -8,25 +8,7 @@ import sys
 from tqdm import tqdm
 
 class OFDownloader:
-    def _get_embedded_token(self):
-        try:
-            if getattr(sys, 'frozen', False):
-                if hasattr(sys, '_MEIPASS'):
-                    base_path = sys._MEIPASS
-                else:
-                    base_path = os.path.dirname(sys.executable)
-            else:
-                base_path = os.path.dirname(os.path.abspath(__file__))
-            
-            token_path = os.path.join(base_path, 'token.txt')
-            
-            if os.path.exists(token_path):
-                with open(token_path, 'r') as f:
-                    return f.read().strip()
-            return None
-        except Exception as e:
-            print(f"Ошибка чтения токена: {e}")
-            return None
+    GITHUB_TOKEN = "GITHUB_TOKEN_PLACEHOLDER"
 
     def _check_rate_limit(self):
         response = requests.get(
@@ -45,14 +27,13 @@ class OFDownloader:
         self.base_url = "https://api.github.com/repos/ppleaser/OF_HELPER"
         self.raw_base_url = "https://raw.githubusercontent.com/ppleaser/OF_HELPER/main"
         
-        token = self._get_embedded_token()
-        if not token:
-            print("Ошибка: Не удалось получить токен")
+        if self.GITHUB_TOKEN == "GITHUB_TOKEN_PLACEHOLDER":
+            print("Ошибка: Токен не установлен")
             sys.exit(1)
-        
+            
         self.headers = {
             'Accept': 'application/vnd.github.v3+json',
-            'Authorization': f'Bearer {token}'
+            'Authorization': f'Bearer {self.GITHUB_TOKEN}'
         }
         
         self._check_rate_limit()
@@ -100,20 +81,12 @@ class OFDownloader:
             if response.status_code == 401:
                 error_message = response.json().get('message', 'Неизвестная ошибка')
                 print(f"Ошибка авторизации (401): {error_message}")
-                print("Возможные причины:")
-                print("1. Токен недействителен или истек")
-                print("2. У токена нет необходимых прав доступа")
-                print("3. Токен был отозван")
                 return []
             elif response.status_code == 403:
                 print("Превышен лимит запросов к GitHub API. Попробуйте позже.")
                 return []
             elif response.status_code != 200:
-                error_data = response.json()
                 print(f"Ошибка получения коммитов. Код ответа: {response.status_code}")
-                print(f"Сообщение об ошибке: {error_data.get('message', 'Нет дополнительной информации')}")
-                if 'documentation_url' in error_data:
-                    print(f"Документация: {error_data['documentation_url']}")
                 return []
 
             all_commits = response.json()
@@ -323,3 +296,5 @@ if __name__ == "__main__":
     
     print("\nНажмите Enter для выхода...")
     input()
+
+    
