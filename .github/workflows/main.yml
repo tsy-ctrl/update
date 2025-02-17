@@ -36,6 +36,18 @@ jobs:
         $escapedToken = $env:TOKEN -replace '\\', '\\' -replace '"', '\"'
         $content = $content -replace 'GITHUB_TOKEN_PLACEHOLDER', $escapedToken
         Set-Content -Path update.py -Value $content
+        
+        # Verification (Only first 10 chars)
+        Write-Host "Verifying token replacement in file:"
+        $verifyContent = Get-Content -Path update.py -Raw
+        if ($verifyContent -match 'GITHUB_TOKEN = "(.*?)"') {
+            $foundToken = $matches[1]
+            Write-Host "Found token starts with: $($foundToken.Substring(0, [Math]::Min(10, $foundToken.Length)))..."
+        } else {
+            Write-Host "Token pattern not found in file!"
+            Write-Host "File content preview:"
+            Get-Content -Path update.py | Select-Object -First 20
+        }
     
     - name: Build executable
       run: |
@@ -73,6 +85,12 @@ jobs:
       run: |
         escaped_token=$(echo "$TOKEN" | sed 's/[\/&]/\\&/g')
         sed -i.bak "s/GITHUB_TOKEN_PLACEHOLDER/$escaped_token/g" update.py
+        
+        # Verification (Only first 10 chars)
+        echo "Verifying token replacement in file:"
+        echo "Found token starts with: $(grep -o 'GITHUB_TOKEN = "[^"]*"' update.py | cut -d'"' -f2 | cut -c1-10)..."
+        echo "File content preview:"
+        head -n 20 update.py
     
     - name: Build executable
       run: |
