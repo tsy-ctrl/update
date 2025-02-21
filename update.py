@@ -267,7 +267,6 @@ class OFDownloader:
                         if os.path.exists(full_path):
                             try:
                                 os.remove(full_path)
-                                print(f"Файл удалён: {filename}")
                             except Exception as e:
                                 print(f"Ошибка удаления файла {filename}: {e}")
                         else:
