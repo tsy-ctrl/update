@@ -39,7 +39,7 @@ class OFDownloader:
         
         if getattr(sys, 'frozen', False):
             if sys.platform == 'darwin':
-                self.root_dir = os.path.abspath(os.path.join(os.path.dirname(sys.executable), '..', '..'))
+                self.root_dir = os.path.abspath(os.path.join(os.path.dirname(sys.executable), '..', '..', '..'))
             else:
                 self.root_dir = os.path.dirname(os.path.dirname(sys.executable))
         else:
@@ -123,17 +123,40 @@ class OFDownloader:
                 print(f"Ошибка скачивания {file_path}: {response.status_code}")
                 return False
 
-            norm_file_path = file_path.replace('/', os.sep)
+            norm_file_path = os.path.normpath(file_path.replace('/', os.sep))
             full_path = os.path.join(self.root_dir, norm_file_path)
+
+            dir_path = os.path.dirname(full_path)
+            try:
+                os.makedirs(dir_path, mode=0o755, exist_ok=True)
+            except PermissionError as e:
+                print(f"Ошибка доступа при создании директории {dir_path}: {e}")
+                return False
             
-            os.makedirs(os.path.dirname(full_path), exist_ok=True)
-            
+            if not os.path.exists(dir_path):
+                print(f"Не удалось создать директорию {dir_path}")
+                return False
+                
+            if os.path.exists(full_path) and not os.access(full_path, os.W_OK):
+                print(f"Нет прав на запись в файл {full_path}")
+                return False
+                
             try:
                 with open(full_path, 'wb') as f:
                     f.write(response.content)
+
+                if not os.path.exists(full_path):
+                    print(f"Файл не был создан: {full_path}")
+                    return False
+
+                os.chmod(full_path, 0o644)
                 return True
-            except Exception as e:
-                print(f"Ошибка сохранения файла {full_path}: {e}")
+                
+            except PermissionError as e:
+                print(f"Ошибка прав доступа при сохранении файла {full_path}: {e}")
+                return False
+            except IOError as e:
+                print(f"Ошибка ввода-вывода при сохранении файла {full_path}: {e}")
                 return False
 
         except Exception as e:
