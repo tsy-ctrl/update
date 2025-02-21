@@ -39,7 +39,7 @@ class OFDownloader:
         
         if getattr(sys, 'frozen', False):
             if sys.platform == 'darwin':
-                self.root_dir = os.path.abspath(os.path.join(os.path.dirname(sys.executable), '..', '..', '..'))
+                self.root_dir = os.path.abspath(os.path.join(os.path.dirname(sys.executable), '..', '..'))
             else:
                 self.root_dir = os.path.dirname(os.path.dirname(sys.executable))
         else:
