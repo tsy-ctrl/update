@@ -256,18 +256,37 @@ class OFDownloader:
                     bar_format='{l_bar}{bar}| {n_fmt}/{total_fmt}') as pbar:
                 for file_data in files_to_process:
                     filename = file_data.get('filename')
-                    if filename:
-                        if self.get_later_updates_for_file(filename, commit['sha'], all_commits):
-                            skipped_files.append(filename)
-                            pbar.update(1)
-                            continue
-
-                        if self._download_file(filename):
-                            changed_files.append(filename)
+                    if not filename:
+                        pbar.update(1)
+                        continue
+                    
+                    status = file_data.get('status', '')
+                    if status == "removed":
+                        norm_file_path = filename.replace('/', os.sep)
+                        full_path = os.path.join(self.root_dir, norm_file_path)
+                        if os.path.exists(full_path):
+                            try:
+                                os.remove(full_path)
+                                print(f"Файл удалён: {filename}")
+                            except Exception as e:
+                                print(f"Ошибка удаления файла {filename}: {e}")
                         else:
-                            all_files_updated = False
-                            print(f"Ошибка обновления файла: {filename}")
-                            break
+                            print(f"Файл для удаления не найден: {filename}")
+                        changed_files.append(filename)
+                        pbar.update(1)
+                        continue
+
+                    if self.get_later_updates_for_file(filename, commit['sha'], all_commits):
+                        skipped_files.append(filename)
+                        pbar.update(1)
+                        continue
+
+                    if self._download_file(filename):
+                        changed_files.append(filename)
+                    else:
+                        all_files_updated = False
+                        print(f"Ошибка обновления файла: {filename}")
+                        break
                     pbar.update(1)
 
             if not all_files_updated:
