@@ -139,18 +139,46 @@ class OFDownloader:
         except Exception as e:
             print(f"Общая ошибка скачивания {file_path}: {e}")
             return False
-
+    
     def _remove_file(self, file_path: str) -> bool:
         try:
             norm_file_path = file_path.replace('/', os.sep)
             full_path = os.path.join(self.root_dir, norm_file_path)
             
-            if os.path.exists(full_path):
+            if not os.path.exists(full_path):
+                print(f"Файл не существует: {full_path}")
+                return False
+
+            current_permissions = os.stat(full_path).st_mode
+            
+            try:
+
+                os.chmod(full_path, current_permissions | 0o600)
+
+                if not os.access(full_path, os.W_OK):
+                    print(f"Не удалось получить права на запись для файла: {full_path}")
+                    return False
+
                 os.remove(full_path)
+            
+                if os.path.exists(full_path):
+                    print(f"Файл не был удален: {full_path}")
+                    return False
+                    
                 return True
+                
+            except PermissionError as pe:
+                print(f"Ошибка прав доступа при удалении файла {full_path}: {pe}")
+                return False
+                
+        except FileNotFoundError:
+            print(f"Файл не найден: {full_path}")
+            return False
+        except OSError as oe:
+            print(f"Системная ошибка при удалении файла {full_path}: {oe}")
             return False
         except Exception as e:
-            print(f"Ошибка удаления файла {file_path}: {e}")
+            print(f"Неожиданная ошибка при удалении файла {full_path}: {e}")
             return False
 
     def get_later_updates_for_file(self, file_path: str, commit_sha: str, all_commits: List[Dict]) -> bool:
@@ -272,21 +300,18 @@ class OFDownloader:
                     if filename:
                         status = file_data.get('status', '')
                         
-                        # Проверяем, есть ли более поздние обновления для файла
                         if self.get_later_updates_for_file(filename, commit['sha'], all_commits):
                             skipped_files.append(filename)
                             pbar.update(1)
                             continue
                         
-                        # Обработка удаления файла
                         if status == "removed":
                             if self._remove_file(filename):
                                 changed_files.append(f"{filename} (удален)")
                             else:
                                 all_files_updated = False
                                 print(f"\nОшибка удаления файла: {filename}")
-                                break
-                        # Обработка добавления/изменения файла
+            
                         else:
                             if self._download_file(filename):
                                 changed_files.append(filename)
