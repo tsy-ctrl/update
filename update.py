@@ -259,7 +259,7 @@ class OFDownloader:
                     if not filename:
                         pbar.update(1)
                         continue
-                    
+
                     status = file_data.get('status', '')
                     if status == "removed":
                         norm_file_path = filename.replace('/', os.sep)
@@ -268,9 +268,7 @@ class OFDownloader:
                             try:
                                 os.remove(full_path)
                             except Exception as e:
-                                print(f"Ошибка удаления файла {filename}: {e}")
-                        else:
-                            print(f"Файл для удаления не найден: {filename}")
+                                print(f"\nОшибка удаления файла {filename}: {e}")
                         changed_files.append(filename)
                         pbar.update(1)
                         continue
@@ -284,7 +282,7 @@ class OFDownloader:
                         changed_files.append(filename)
                     else:
                         all_files_updated = False
-                        print(f"Ошибка обновления файла: {filename}")
+                        print(f"\nОшибка обновления файла: {filename}")
                         break
                     pbar.update(1)
 
