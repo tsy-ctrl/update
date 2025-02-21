@@ -309,9 +309,7 @@ class OFDownloader:
                             if self._remove_file(filename):
                                 changed_files.append(f"{filename} (удален)")
                             else:
-                                all_files_updated = False
                                 print(f"\nОшибка удаления файла: {filename}")
-            
                         else:
                             if self._download_file(filename):
                                 changed_files.append(filename)
