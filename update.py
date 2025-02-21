@@ -8,7 +8,6 @@ import sys
 from tqdm import tqdm
 
 class OFDownloader:
-
     GITHUB_TOKEN = "GITHUB_TOKEN_PLACEHOLDER"
 
     def _check_rate_limit(self):
@@ -111,11 +110,33 @@ class OFDownloader:
         except Exception:
             return date_str
 
-    def _download_file(self, file_path: str) -> bool:
+    def _handle_file(self, file_path: str, status: str) -> bool:
         try:
             if not file_path:
                 return False
 
+            norm_file_path = file_path.replace('/', os.sep)
+            full_path = os.path.join(self.root_dir, norm_file_path)
+
+            # Если файл помечен как удаленный, удаляем его
+            if status == "removed":
+                try:
+                    if os.path.exists(full_path):
+                        os.remove(full_path)
+                        # Пытаемся удалить пустые родительские директории
+                        current_dir = os.path.dirname(full_path)
+                        while current_dir != self.root_dir:
+                            if len(os.listdir(current_dir)) == 0:
+                                os.rmdir(current_dir)
+                                current_dir = os.path.dirname(current_dir)
+                            else:
+                                break
+                    return True
+                except Exception as e:
+                    print(f"Ошибка при удалении файла {full_path}: {e}")
+                    return False
+
+            # Для обновляемых файлов скачиваем новую версию
             file_path = file_path.replace('\\', '/')
             response = requests.get(f"{self.raw_base_url}/{file_path}", headers=self.headers)
             
@@ -123,12 +144,11 @@ class OFDownloader:
                 print(f"Ошибка скачивания {file_path}: {response.status_code}")
                 return False
 
-            norm_file_path = file_path.replace('/', os.sep)
-            full_path = os.path.join(self.root_dir, norm_file_path)
-            
-            os.makedirs(os.path.dirname(full_path), exist_ok=True)
-            
             try:
+                # Создаем директории, если их нет
+                os.makedirs(os.path.dirname(full_path), exist_ok=True)
+                
+                # Записываем содержимое файла
                 with open(full_path, 'wb') as f:
                     f.write(response.content)
                 return True
@@ -137,48 +157,7 @@ class OFDownloader:
                 return False
 
         except Exception as e:
-            print(f"Общая ошибка скачивания {file_path}: {e}")
-            return False
-    
-    def _remove_file(self, file_path: str) -> bool:
-        try:
-            norm_file_path = file_path.replace('/', os.sep)
-            full_path = os.path.join(self.root_dir, norm_file_path)
-            
-            if not os.path.exists(full_path):
-                print(f"Файл не существует: {full_path}")
-                return False
-
-            current_permissions = os.stat(full_path).st_mode
-            
-            try:
-
-                os.chmod(full_path, current_permissions | 0o600)
-
-                if not os.access(full_path, os.W_OK):
-                    print(f"Не удалось получить права на запись для файла: {full_path}")
-                    return False
-
-                os.remove(full_path)
-            
-                if os.path.exists(full_path):
-                    print(f"Файл не был удален: {full_path}")
-                    return False
-                    
-                return True
-                
-            except PermissionError as pe:
-                print(f"Ошибка прав доступа при удалении файла {full_path}: {pe}")
-                return False
-                
-        except FileNotFoundError:
-            print(f"Файл не найден: {full_path}")
-            return False
-        except OSError as oe:
-            print(f"Системная ошибка при удалении файла {full_path}: {oe}")
-            return False
-        except Exception as e:
-            print(f"Неожиданная ошибка при удалении файла {full_path}: {e}")
+            print(f"Общая ошибка обработки {file_path}: {e}")
             return False
 
     def get_later_updates_for_file(self, file_path: str, commit_sha: str, all_commits: List[Dict]) -> bool:
@@ -305,18 +284,12 @@ class OFDownloader:
                             pbar.update(1)
                             continue
                         
-                        if status == "removed":
-                            if self._remove_file(filename):
-                                changed_files.append(f"{filename} (удален)")
-                            else:
-                                print(f"\nОшибка удаления файла: {filename}")
+                        if self._handle_file(filename, status):
+                            changed_files.append(f"{filename} (удален)" if status == "removed" else filename)
                         else:
-                            if self._download_file(filename):
-                                changed_files.append(filename)
-                            else:
-                                all_files_updated = False
-                                print(f"\nОшибка обновления файла: {filename}")
-                                break
+                            all_files_updated = False
+                            print(f"\nОшибка обновления файла: {filename}")
+                            break
                     pbar.update(1)
 
             if not all_files_updated:
