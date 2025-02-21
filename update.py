@@ -110,18 +110,22 @@ class OFDownloader:
         except Exception:
             return date_str
 
-    def _handle_file(self, file_path: str, status: str) -> bool:
+    def _download_file(self, file_path: str, status: str) -> bool:
         try:
             if not file_path:
                 return False
 
-            norm_file_path = file_path.replace('/', os.sep)
-            full_path = os.path.join(self.root_dir, norm_file_path)
-
+            # Normalize file path for download
+            file_path = file_path.replace('\\', '/')
+            
+            # Handle file deletion
             if status == "removed":
-                try:
-                    if os.path.exists(full_path):
+                norm_file_path = file_path.replace('/', os.sep)
+                full_path = os.path.join(self.root_dir, norm_file_path)
+                if os.path.exists(full_path):
+                    try:
                         os.remove(full_path)
+                        # Clean up empty directories
                         current_dir = os.path.dirname(full_path)
                         while current_dir != self.root_dir:
                             if len(os.listdir(current_dir)) == 0:
@@ -129,20 +133,27 @@ class OFDownloader:
                                 current_dir = os.path.dirname(current_dir)
                             else:
                                 break
-                    return True
-                except Exception as e:
-                    print(f"Ошибка при удалении файла {full_path}: {e}")
-                    return True
+                    except Exception as e:
+                        print(f"Ошибка при удалении файла {full_path}: {e}")
+                        return False
+                return True
 
-            file_path = file_path.replace('\\', '/')
+            # Download file
             response = requests.get(f"{self.raw_base_url}/{file_path}", headers=self.headers)
             
             if response.status_code != 200:
                 print(f"Ошибка скачивания {file_path}: {response.status_code}")
                 return False
 
+            # Create full path using proper separators
+            norm_file_path = file_path.replace('/', os.sep)
+            full_path = os.path.join(self.root_dir, norm_file_path)
+            
+            # Ensure directory exists
+            os.makedirs(os.path.dirname(full_path), exist_ok=True)
+            
+            # Write file
             try:
-                os.makedirs(os.path.dirname(full_path), exist_ok=True)
                 with open(full_path, 'wb') as f:
                     f.write(response.content)
                 return True
@@ -151,7 +162,7 @@ class OFDownloader:
                 return False
 
         except Exception as e:
-            print(f"Общая ошибка обработки {file_path}: {e}")
+            print(f"Общая ошибка скачивания {file_path}: {e}")
             return False
 
     def get_later_updates_for_file(self, file_path: str, commit_sha: str, all_commits: List[Dict]) -> bool:
@@ -278,7 +289,7 @@ class OFDownloader:
                             pbar.update(1)
                             continue
                         
-                        if self._handle_file(filename, status):
+                        if self._download_file(filename, status):
                             changed_files.append(f"{filename} (удален)" if status == "removed" else filename)
                         else:
                             all_files_updated = False
