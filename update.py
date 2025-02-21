@@ -38,7 +38,7 @@ class OFDownloader:
         
         if getattr(sys, 'frozen', False):
             if sys.platform == 'darwin':
-                self.root_dir = os.path.abspath(os.path.join(os.path.dirname(sys.executable), '..', '..', '..'))
+                self.root_dir = os.path.abspath(os.path.join(os.path.dirname(sys.executable), '..'))
             else:
                 self.root_dir = os.path.dirname(os.path.dirname(sys.executable))
         else:
@@ -109,23 +109,20 @@ class OFDownloader:
             return local_date.strftime('%d.%m.%Y %H:%M:%S')
         except Exception:
             return date_str
-
+    
     def _download_file(self, file_path: str, status: str) -> bool:
         try:
             if not file_path:
                 return False
 
-            # Normalize file path for download
             file_path = file_path.replace('\\', '/')
             
-            # Handle file deletion
             if status == "removed":
                 norm_file_path = file_path.replace('/', os.sep)
                 full_path = os.path.join(self.root_dir, norm_file_path)
                 if os.path.exists(full_path):
                     try:
                         os.remove(full_path)
-                        # Clean up empty directories
                         current_dir = os.path.dirname(full_path)
                         while current_dir != self.root_dir:
                             if len(os.listdir(current_dir)) == 0:
@@ -135,24 +132,19 @@ class OFDownloader:
                                 break
                     except Exception as e:
                         print(f"Ошибка при удалении файла {full_path}: {e}")
-                        return False
+                        return True
                 return True
-
-            # Download file
             response = requests.get(f"{self.raw_base_url}/{file_path}", headers=self.headers)
             
             if response.status_code != 200:
                 print(f"Ошибка скачивания {file_path}: {response.status_code}")
                 return False
-
-            # Create full path using proper separators
+            
             norm_file_path = file_path.replace('/', os.sep)
             full_path = os.path.join(self.root_dir, norm_file_path)
             
-            # Ensure directory exists
             os.makedirs(os.path.dirname(full_path), exist_ok=True)
-            
-            # Write file
+
             try:
                 with open(full_path, 'wb') as f:
                     f.write(response.content)
