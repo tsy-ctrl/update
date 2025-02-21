@@ -118,12 +118,10 @@ class OFDownloader:
             norm_file_path = file_path.replace('/', os.sep)
             full_path = os.path.join(self.root_dir, norm_file_path)
 
-            # Если файл помечен как удаленный, удаляем его
             if status == "removed":
                 try:
                     if os.path.exists(full_path):
                         os.remove(full_path)
-                        # Пытаемся удалить пустые родительские директории
                         current_dir = os.path.dirname(full_path)
                         while current_dir != self.root_dir:
                             if len(os.listdir(current_dir)) == 0:
@@ -134,9 +132,8 @@ class OFDownloader:
                     return True
                 except Exception as e:
                     print(f"Ошибка при удалении файла {full_path}: {e}")
-                    return False
+                    return True
 
-            # Для обновляемых файлов скачиваем новую версию
             file_path = file_path.replace('\\', '/')
             response = requests.get(f"{self.raw_base_url}/{file_path}", headers=self.headers)
             
@@ -145,10 +142,7 @@ class OFDownloader:
                 return False
 
             try:
-                # Создаем директории, если их нет
                 os.makedirs(os.path.dirname(full_path), exist_ok=True)
-                
-                # Записываем содержимое файла
                 with open(full_path, 'wb') as f:
                     f.write(response.content)
                 return True
