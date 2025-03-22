@@ -222,26 +222,34 @@ class OFDownloader:
             return
         
         if target_commit_index is None:
-            if self.status_data.get("last_commit"):
-                last_installed_index = next(
-                    (i for i, commit in enumerate(all_commits) if commit['sha'] == self.status_data["last_commit"]),
-                    None
-                )
-                if last_installed_index is None:
-                    commits_to_update = [all_commits[0]]
-                elif last_installed_index == 0:
-                    print("Нет обновлений")
-                    return
-                else:
-                    target_commit_index = last_installed_index - 1
-                    commits_to_update = all_commits[target_commit_index::-1]
-            else:
-                commits_to_update = [all_commits[0]]
-        else:
-            if target_commit_index < 0 or target_commit_index >= len(all_commits):
-                print(f"Неправильный номер обновления. Доступны обновления с 1 по {len(all_commits)}")
+            # Если нажали Enter - берем первое обновление (самое новое)
+            target_commit_index = 0
+        
+        # Проверяем наличие последнего установленного обновления
+        last_installed_index = None
+        if self.status_data.get("last_commit"):
+            last_installed_index = next(
+                (i for i, commit in enumerate(all_commits) if commit['sha'] == self.status_data["last_commit"]),
+                None
+            )
+        
+        if last_installed_index is not None:
+            # Если есть установленное обновление
+            if last_installed_index == 0:
+                print("Нет обновлений")
                 return
-            commits_to_update = all_commits[target_commit_index::-1]
+            elif target_commit_index >= last_installed_index:
+                print("Выбранное обновление уже установлено или устарело")
+                return
+            else:
+                # Выбираем обновления от целевого до последнего установленного (не включая его)
+                commits_to_update = all_commits[target_commit_index:last_installed_index]
+        else:
+            # Если нет установленного обновления, берем все от выбранного до самого старого
+            commits_to_update = all_commits[target_commit_index:]
+        
+        # Разворачиваем список, чтобы идти от старых к новым
+        commits_to_update = commits_to_update[::-1]
 
         if not commits_to_update:
             print("Нет обновлений")
@@ -250,7 +258,7 @@ class OFDownloader:
         print(f"Получено {len(commits_to_update)} обновлений:")
 
         for i, commit in enumerate(commits_to_update):
-            actual_update_number = len(commits_to_update) - i
+            actual_update_number = i + 1
             commit_date = self.format_commit_date(commit['commit']['author']['date'])
             print(f"\n{actual_update_number}. {commit_date} - {commit['commit']['message']}")
             print(f"\nНачало обновления {actual_update_number}/{len(commits_to_update)}")
